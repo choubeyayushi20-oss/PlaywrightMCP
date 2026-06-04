@@ -1,7 +1,7 @@
 """Pytest configuration and fixtures for Playwright tests."""
 
 import pytest
-from playwright.sync_api import sync_playwright, Browser, Page
+from playwright.sync_api import sync_playwright, Browser
 
 
 @pytest.fixture(scope="session")
