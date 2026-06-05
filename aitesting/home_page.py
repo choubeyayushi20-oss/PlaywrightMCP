@@ -18,6 +18,9 @@ class HomePage(BasePage):
     PRODUCT_LIST = "//div[contains(@class, 'col-lg')]"
     PRODUCT_TITLE = "//a[contains(@class, 'hrefch')]"
     CATEGORY_LINK_BY_TEXT = "//a[contains(text(), '{category}')]"
+    PRODUCT_CONTAINER = "//div[@id='tbodyid']"  # Active product list
+    # For scoped product counting (relative XPath)
+    PRODUCT_TITLE_SCOPED = "xpath=.//a[@class='hrefch']"
 
     def __init__(self, page: Page):
         """Initialize the Home page.
@@ -99,9 +102,25 @@ class HomePage(BasePage):
             category_name: Name of the category to click (e.g., 'Laptops', 'Phones')
         """
         category_selector = self.CATEGORY_LINK_BY_TEXT.format(category=category_name)
+
+        # Get the current product count before clicking
+        initial_count = self.get_product_count()
+
+        # Click the category
         self.page.locator(category_selector).click()
-        # Wait for products to load by waiting for product titles to appear
-        self.page.wait_for_selector(self.PRODUCT_TITLE, timeout=10000)
+
+        # Wait for the product list to change by polling product count
+        max_attempts = 20
+        attempt = 0
+        current_count = initial_count
+
+        while current_count == initial_count and attempt < max_attempts:
+            self.page.wait_for_timeout(250)
+            current_count = self.get_product_count()
+            attempt += 1
+
+        # Additional wait for DOM to settle
+        self.page.wait_for_timeout(300)
 
     def get_product_count(self) -> int:
         """Get the number of products displayed on the page.
@@ -110,8 +129,13 @@ class HomePage(BasePage):
             Number of products
         """
         try:
-            # Count product titles which is more reliable than counting containers
-            product_elements = self.page.locator(self.PRODUCT_TITLE)
+            # Count product titles only in the active product container (tbodyid)
+            # Use relative XPath to scope the search to the container
+            product_container = self.page.locator(self.PRODUCT_CONTAINER)
+            if product_container.count() == 0:
+                return 0
+
+            product_elements = product_container.locator(self.PRODUCT_TITLE_SCOPED)
             return product_elements.count()
         except Exception:
             return 0
@@ -123,7 +147,13 @@ class HomePage(BasePage):
             List of product titles
         """
         try:
-            product_elements = self.page.locator(self.PRODUCT_TITLE)
+            # Get titles only from the active product container (tbodyid)
+            # Use relative XPath to scope the search to the container
+            product_container = self.page.locator(self.PRODUCT_CONTAINER)
+            if product_container.count() == 0:
+                return []
+
+            product_elements = product_container.locator(self.PRODUCT_TITLE_SCOPED)
             titles = []
             for i in range(product_elements.count()):
                 try:
@@ -155,8 +185,16 @@ class HomePage(BasePage):
             True if at least one product is visible, False otherwise
         """
         try:
-            return self.get_product_count() > 0
-        except Exception:
+            # Check if product container exists and has products
+            product_container = self.page.locator(self.PRODUCT_CONTAINER)
+            if product_container.count() == 0:
+                return False
+
+            # Check if container has products
+            product_count = self.get_product_count()
+            return product_count > 0
+        except Exception as e:
+            print(f"Error verifying products loaded: {e}")
             return False
 
 
