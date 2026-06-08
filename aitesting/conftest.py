@@ -1,5 +1,6 @@
 """Pytest configuration and fixtures for Playwright tests."""
 
+import os
 import pytest
 from playwright.sync_api import sync_playwright, Browser, Page
 
@@ -11,8 +12,13 @@ def browser():
     Yields:
         Browser instance
     """
+    # Allow CI to run in headless mode by default. Set environment variable
+    # HEADLESS to "0"/"false"/"no" to force headed mode when running locally.
+    headless_env = os.getenv("HEADLESS", "true").lower()
+    headless = headless_env not in ("0", "false", "no")
+
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)  # headless=False for headed mode
+        browser = p.chromium.launch(headless=headless)
         yield browser
         browser.close()
 
